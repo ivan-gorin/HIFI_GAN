@@ -35,8 +35,8 @@
   "lr_scheduler": {
     "type": "OneCycleLR",
     "args": {
-      "steps_per_epoch": 50000,
-      "epochs": 50,
+      "steps_per_epoch": 5000,
+      "epochs": 1,
       "anneal_strategy": "cos",
       "max_lr": 4e-3,
       "pct_start": 0.2
@@ -50,7 +50,7 @@
     "save_period": 5,
     "verbosity": 2,
     "early_stop": 100,
-    "len_epoch": 2000,
+    "len_epoch": 5000,
     "val_len_epoch": 5,
     "visualize": "wandb",
     "wandb_project": "HIFI",

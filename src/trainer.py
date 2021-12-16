@@ -68,12 +68,13 @@ class Trainer:
             self.writer.add_scalar("Loss", loss)
             if self.overfit and batch_idx % self.log_audio_interval == 0:
                 # if self.config['trainer']['visualize'] == 'wandb':
-                self.writer.add_image('True spec', plt.imshow(spec[0].detach().cpu().numpy()))
-                self.writer.add_image('Pred spec', plt.imshow(pred_spec[0].detach().cpu().numpy()))
-                self.writer.add_audio('True audio', waveform[0],
-                                      sample_rate=self.config['melspectrogram']['sample_rate'])
-                self.writer.add_audio('Pred audio', pred_wav[0],
-                                      sample_rate=self.config['melspectrogram']['sample_rate'])
+                for idx in (1, 2):
+                    self.writer.add_image(f'True spec {idx}', plt.imshow(spec[idx].detach().cpu().numpy()))
+                    self.writer.add_image(f'Pred spec {idx}', plt.imshow(pred_spec[idx].detach().cpu().numpy()))
+                    self.writer.add_audio(f'True audio {idx}', waveform[idx],
+                                          sample_rate=self.config['melspectrogram']['sample_rate'])
+                    self.writer.add_audio(f'Pred audio {idx}', pred_wav[idx],
+                                          sample_rate=self.config['melspectrogram']['sample_rate'])
             loss.backward()
             self.optimizer.step()
             self.scheduler.step()

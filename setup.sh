@@ -1,6 +1,3 @@
-if ! [[ -d "./third_party/waveglow" ]]; then
-    git clone https://github.com/NVIDIA/waveglow.git ./third_party/waveglow
-fi
 mkdir data
 cd data
 if ! [[ -d "LJSpeech-1.1" ]]; then
