@@ -1,0 +1,7 @@
+librosa
+torch
+torchaudio
+tqdm
+wandb
+tensorboard
+matplotlib
