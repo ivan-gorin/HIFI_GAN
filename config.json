@@ -1,0 +1,59 @@
+{
+  "name": "main_config",
+  "device": "cuda",
+  "random_seed": 42,
+  "melspectrogram": {
+    "sample_rate": 22050,
+    "win_length": 1024,
+    "hop_length": 256,
+    "n_fft": 1024,
+    "f_min": 0,
+    "f_max": 8000,
+    "n_mels": 80
+  },
+  "data": {
+    "root": "./data",
+    "split": 0.95,
+    "train": {
+      "batch_size": 4,
+      "num_workers": 6,
+      "shuffle": false
+    },
+    "val": {
+      "batch_size": 4,
+      "num_workers": 6,
+      "shuffle": true
+    }
+  },
+  "optimizer": {
+    "type": "Adam",
+    "args": {
+      "lr": 3e-4,
+      "weight_decay": 0.0001
+    }
+  },
+  "lr_scheduler": {
+    "type": "OneCycleLR",
+    "args": {
+      "steps_per_epoch": 100,
+      "epochs": 50,
+      "anneal_strategy": "cos",
+      "max_lr": 4e-3,
+      "pct_start": 0.2
+    }
+  },
+  "trainer": {
+    "overfit": true,
+    "n_epoch": 5,
+    "do_save": false,
+    "save_dir": "saved/",
+    "save_period": 5,
+    "verbosity": 2,
+    "early_stop": 100,
+    "len_epoch": 300,
+    "val_len_epoch": 5,
+    "visualize": "wandb",
+    "wandb_project": "HIFI",
+    "log_audio_interval": 50
+  }
+}

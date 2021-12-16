@@ -1,0 +1,7 @@
+/wandb/
+/venv/
+/log/
+/data/
+.*
+!.gitignore
+/saved/
