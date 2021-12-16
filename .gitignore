@@ -1,1 +1,7 @@
-/.python-version
+/wandb/
+/venv/
+/log/
+/data/
+.*
+!.gitignore
+/saved/
