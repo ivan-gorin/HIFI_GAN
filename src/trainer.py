@@ -66,7 +66,8 @@ class Trainer:
 
         if is_train:
             self.writer.add_scalar("Loss", loss)
-            if self.overfit and self.log_audio_interval:
+            if self.overfit and batch_idx % self.log_audio_interval == 0:
+                # if self.config['trainer']['visualize'] == 'wandb':
                 self.writer.add_image('True spec', plt.imshow(spec[0].detach().cpu().numpy()))
                 self.writer.add_image('Pred spec', plt.imshow(pred_spec[0].detach().cpu().numpy()))
                 self.writer.add_audio('True audio', waveform[0],

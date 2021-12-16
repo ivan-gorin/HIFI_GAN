@@ -35,7 +35,7 @@
   "lr_scheduler": {
     "type": "OneCycleLR",
     "args": {
-      "steps_per_epoch": 100,
+      "steps_per_epoch": 50000,
       "epochs": 50,
       "anneal_strategy": "cos",
       "max_lr": 4e-3,
@@ -44,13 +44,13 @@
   },
   "trainer": {
     "overfit": true,
-    "n_epoch": 5,
+    "n_epoch": 1,
     "do_save": false,
     "save_dir": "saved/",
     "save_period": 5,
     "verbosity": 2,
     "early_stop": 100,
-    "len_epoch": 300,
+    "len_epoch": 2000,
     "val_len_epoch": 5,
     "visualize": "wandb",
     "wandb_project": "HIFI",
