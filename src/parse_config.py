@@ -1,5 +1,4 @@
 import torch
-import os
 import json
 from datetime import datetime
 from pathlib import Path
@@ -7,12 +6,12 @@ from itertools import repeat
 
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import OneCycleLR
-from .model import Generator, ModelConfig
+from .model import Generator, ModelConfig, MPD, MSD
 from .dataset import LJSpeechDataset
 from .collator import LJSpeechCollator
 from .melspectrogram import MelSpectrogram
 from .loss import GeneratorLoss
-from .logger import WanDBWriter, TensorboardWriter
+from .writer import WanDBWriter, TensorboardWriter
 from torch.utils.data import DataLoader
 from typing import Tuple
 import logging
@@ -59,6 +58,11 @@ class ConfigParser:
         self.name = self.config['name']
         self.seed = self.config['random_seed']
 
+        if 'model' in self.config:
+            self.model_config = ModelConfig(**self.config['model'])
+        else:
+            self.model_config = ModelConfig()
+
         self.device = 'cpu'
         if self.config['device'] == 'cuda' and torch.cuda.is_available():
             self.device = torch.device('cuda:0')
@@ -103,12 +107,12 @@ class ConfigParser:
         return MelSpectrogram(self.config['melspectrogram'], 1.).to(self.device)
 
     def get_model(self):
-        if 'model' in self.config:
-            model_config = ModelConfig(**self.config['model'])
-        else:
-            model_config = ModelConfig()
-        model = Generator(model_config).to(self.device)
+
+        model = Generator(self.model_config).to(self.device)
         return model
+
+    def get_discriminators(self):
+        return MSD(self.model_config).to(self.device), MPD(self.model_config).to(self.device)
 
     def get_criterion(self):
         return GeneratorLoss()

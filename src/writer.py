@@ -35,36 +35,36 @@ class WanDBWriter:
             self.add_scalar("steps_per_sec", 1 / duration.total_seconds())
             self.timer = datetime.now()
 
-    def scalar_name(self, scalar_name):
+    def scalar_name(self, scalar_name, *args, **kwargs):
         return f"{scalar_name}_{self.mode}"
 
-    def add_scalar(self, scalar_name, scalar):
+    def add_scalar(self, scalar_name, scalar, *args, **kwargs):
         self.wandb.log({
             self.scalar_name(scalar_name): scalar,
         }, step=self.step)
 
-    def add_scalars(self, tag, scalars):
+    def add_scalars(self, tag, scalars, *args, **kwargs):
         self.wandb.log({
             **{f"{scalar_name}_{tag}_{self.mode}": scalar for scalar_name, scalar in scalars.items()}
         }, step=self.step)
 
-    def add_image(self, scalar_name, image):
+    def add_image(self, scalar_name, image, *args, **kwargs):
         self.wandb.log({
             self.scalar_name(scalar_name): self.wandb.Image(image)
         }, step=self.step)
 
-    def add_audio(self, scalar_name, audio, sample_rate=None):
+    def add_audio(self, scalar_name, audio, sample_rate=None, *args, **kwargs):
         audio = audio.detach().cpu().numpy().T
         self.wandb.log({
             self.scalar_name(scalar_name): self.wandb.Audio(audio, sample_rate=sample_rate)
         }, step=self.step)
 
-    def add_text(self, scalar_name, text):
+    def add_text(self, scalar_name, text, *args, **kwargs):
         self.wandb.log({
             self.scalar_name(scalar_name): self.wandb.Html(text)
         }, step=self.step)
 
-    def add_histogram(self, scalar_name, hist, bins=None):
+    def add_histogram(self, scalar_name, hist, bins=None, *args, **kwargs):
         hist = hist.detach().cpu().numpy()
         np_hist = np.histogram(hist, bins=bins)
         if np_hist[0].shape[0] > 512:
@@ -78,17 +78,14 @@ class WanDBWriter:
             self.scalar_name(scalar_name): hist
         }, step=self.step)
 
-    def add_images(self, scalar_name, images):
+    def add_images(self, scalar_name, images, *args, **kwargs):
         raise NotImplementedError()
 
-    def add_pr_curve(self, scalar_name, scalar):
+    def add_pr_curve(self, scalar_name, scalar, *args, **kwargs):
         raise NotImplementedError()
 
-    def add_embedding(self, scalar_name, scalar):
+    def add_embedding(self, scalar_name, scalar, *args, **kwargs):
         raise NotImplementedError()
-
-
-
 
 
 class TensorboardWriter:

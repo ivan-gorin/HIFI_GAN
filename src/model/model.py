@@ -1,19 +1,6 @@
-import torch
-from torch import nn, Tensor
-import math
-from dataclasses import dataclass
+from torch import nn
 from torch.nn.utils import weight_norm
-
-
-@dataclass
-class ModelConfig:
-    mel_ch: int = 80
-    hidden_ch: int = 512
-    kernel_u = [16, 16, 4, 4]
-    num_blocks: int = 3
-    kernel_r = [3, 7, 11]
-    dilation_r = [[[1, 1], [3, 1], [5, 1]]] * 3
-    leaky: float = 0.1
+from .utils import ModelConfig, init_weights
 
 
 class ResBlock(nn.Module):
@@ -52,14 +39,14 @@ class Generator(nn.Module):
     def __init__(self, config: ModelConfig):
         super(Generator, self).__init__()
 
-        self.conv1 = nn.Conv1d(config.mel_ch, config.hidden_ch, kernel_size=7, padding='same')
+        self.conv1 = weight_norm(nn.Conv1d(config.mel_ch, config.hidden_ch, kernel_size=7, padding='same'))
 
         block_list = []
         cur_ch = config.hidden_ch
         for k in config.kernel_u:
             block_list.append(nn.Sequential(
                 nn.LeakyReLU(config.leaky),
-                nn.ConvTranspose1d(cur_ch, cur_ch // 2, kernel_size=k, stride=k // 2),
+                weight_norm(nn.ConvTranspose1d(cur_ch, cur_ch // 2, kernel_size=k, stride=k // 2)),
                 MRF(cur_ch // 2, config)
             ))
             cur_ch //= 2
@@ -67,8 +54,11 @@ class Generator(nn.Module):
         self.net = nn.Sequential(*block_list)
 
         self.leaky = nn.LeakyReLU(config.leaky)
-        self.conv2 = nn.Conv1d(cur_ch, 1, kernel_size=7, padding='same')
+        self.conv2 = weight_norm(nn.Conv1d(cur_ch, 1, kernel_size=7, padding='same'))
         self.tan = nn.Tanh()
+
+        self.conv2.apply(init_weights)
+        self.net.apply(init_weights)
 
     def forward(self, x):
         x = self.conv1(x)
@@ -76,4 +66,3 @@ class Generator(nn.Module):
         x = self.leaky(x)
         x = self.conv2(x)
         return self.tan(x).squeeze(1)
-

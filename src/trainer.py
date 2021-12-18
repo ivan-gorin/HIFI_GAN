@@ -11,6 +11,7 @@ class Trainer:
         self.config = config
         self.device = config.get_device()
         self.model = config.get_model()
+        self.MSD, self.MPD = config.get_discriminators()
         self.train_dataloader, self.val_dataloader = config.get_dataloaders()
         self.writer = config.get_writer()
         self.logger = config.get_logger('trainer')
@@ -69,8 +70,8 @@ class Trainer:
             if self.overfit and batch_idx % self.log_audio_interval == 0:
                 # if self.config['trainer']['visualize'] == 'wandb':
                 for idx in (1, 2):
-                    self.writer.add_image(f'True spec {idx}', plt.imshow(spec[idx].detach().cpu().numpy()))
-                    self.writer.add_image(f'Pred spec {idx}', plt.imshow(pred_spec[idx].detach().cpu().numpy()))
+                    self.writer.add_image(f'True spec {idx}', spec[idx].detach().cpu().numpy(), dataformats='HW')
+                    self.writer.add_image(f'Pred spec {idx}', pred_spec[idx].detach().cpu().numpy(), dataformats='HW')
                     self.writer.add_audio(f'True audio {idx}', waveform[idx],
                                           sample_rate=self.config['melspectrogram']['sample_rate'])
                     self.writer.add_audio(f'Pred audio {idx}', pred_wav[idx],
@@ -128,6 +129,8 @@ class Trainer:
         state = {
             "epoch": epoch,
             "state_dict": self.model.state_dict(),
+            "MSD": self.MSD.state_dict(),
+            "MPD": self.MPD.state_dict(),
             "optimizer": self.optimizer.state_dict(),
             "config": self.config,
         }
@@ -168,6 +171,8 @@ class Trainer:
             if param in checkpoint['optimizer']['param_groups'][0]:
                 checkpoint['optimizer']['param_groups'][0][param] = value
         self.optimizer.load_state_dict(checkpoint["optimizer"])
+        self.MSD.load_state_dict(checkpoint['MSD'])
+        self.MPD.load_state_dict(checkpoint['MPD'])
         self.logger.info(self.optimizer)
         self.logger.info(
             "Checkpoint loaded. Resume training from epoch {}".format(self.start_epoch)

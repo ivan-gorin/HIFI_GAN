@@ -5,3 +5,5 @@
 .*
 !.gitignore
 /saved/
+__pycache__/
+*.py[cod]
