@@ -131,6 +131,8 @@ class Trainer:
 
     def _train_epoch(self, num):
         self.model.train()
+        self.MPD.train()
+        self.MSD.train()
         for batch_idx, batch in enumerate(tqdm(self.train_dataloader, desc=f'Epoch {num}', total=self.len_epoch)):
             if batch_idx >= self.len_epoch:
                 break
@@ -138,6 +140,8 @@ class Trainer:
 
     def _val_epoch(self, num):
         self.model.eval()
+        self.MPD.eval()
+        self.MSD.eval()
         self.writer.set_step(num * self.len_epoch, 'val')
         disc_loss_sum = 0
         gen_loss_sum = 0
