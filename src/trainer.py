@@ -51,8 +51,7 @@ class Trainer:
                 audio, sr = torchaudio.load(testdir / file)
                 test_audio.append(audio.squeeze(0))
 
-            waveform = pad_sequence(test_audio).transpose(0, 1).to(self.device)
-            self.test_specs = self.melspectrogram(waveform)
+            self.test_wavs = pad_sequence(test_audio).transpose(0, 1).to(self.device)
 
         self.log_audio_interval = config['trainer']['log_audio_interval']
         self.checkpoint_dir = config.save_dir
@@ -177,16 +176,21 @@ class Trainer:
         self.writer.add_scalar("Generator Loss", gen_loss_sum)
 
         if self.do_test:
-            self.logger.info("Synthesizing test audio...")
-            pred_wav = self.model(self.test_specs).cpu()
-            self.logger.info("Test audio synthesized. Saving...")
-            sr = self.config['melspectrogram']['sample_rate']
-            save_dir = self.config.save_dir / f'epoch{num}'
-            save_dir.mkdir(parents=True, exist_ok=True)
-            for i in range(len(pred_wav)):
-                path = save_dir / f'Synthesized_{self.test_names[i]}.wav'
-                torchaudio.save(path, pred_wav[i], sr)
-                self.writer.add_audio(f'Test audio {self.test_names[i]}', path, sr)
+            with torch.no_grad():
+                self.logger.info("Generating test specs...")
+                test_specs = self.melspectrogram(self.test_wavs)
+                self.logger.info("Synthesizing test audio...")
+                pred_wav = self.model(test_specs).cpu()
+                self.logger.info("Test audio synthesized. Saving...")
+                sr = self.config['melspectrogram']['sample_rate']
+                save_dir = self.config.save_dir / f'epoch{num}'
+                save_dir.mkdir(parents=True, exist_ok=True)
+                for i in range(len(pred_wav)):
+                    path = save_dir / f'Synthesized_{self.test_names[i]}.wav'
+                    torchaudio.save(path, pred_wav[i], sr)
+                    self.writer.add_audio(f'Test audio {self.test_names[i]}', path, sr)
+                    self.writer.add_image(f'Test spec {self.test_names[i]}', test_specs[i].detach().cpu().numpy(),
+                                          dataformats='HW')
 
         return gen_loss_sum
 
