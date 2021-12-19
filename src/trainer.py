@@ -58,8 +58,12 @@ class Trainer:
         self.checkpoint_dir = config.save_dir
         self.save_period = config['trainer']['save_period']
 
-        # self.logger.info(self.model)
-        self.logger.info('Number of parameters {}'.format(sum(p.numel() for p in self.model.parameters())))
+        self.logger.info(self.model)
+        self.logger.info(self.MPD)
+        self.logger.info(self.MSD)
+        self.logger.info('Generator number of parameters {}'.format(sum(p.numel() for p in self.model.parameters())))
+        self.logger.info('MPD number of parameters {}'.format(sum(p.numel() for p in self.MPD.parameters())))
+        self.logger.info('MSD number of parameters {}'.format(sum(p.numel() for p in self.MSD.parameters())))
 
     def train(self):
         try:
