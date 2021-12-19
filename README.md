@@ -9,7 +9,12 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-Run train with 
+Train with
 ```
 python train.py --config config.json
+```
+
+Test with
+```
+python test.py --config config.json --model PATH_TO_CHECKPOINT
 ```
