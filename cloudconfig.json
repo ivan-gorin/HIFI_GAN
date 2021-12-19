@@ -1,0 +1,59 @@
+{
+  "name": "main_config",
+  "device": "cuda",
+  "random_seed": 42,
+  "melspectrogram": {
+    "sample_rate": 22050,
+    "win_length": 1024,
+    "hop_length": 256,
+    "n_fft": 1024,
+    "f_min": 0,
+    "f_max": 8000,
+    "n_mels": 80,
+    "power": 1.0,
+    "center": false,
+    "pad_mode": "reflect",
+    "pad": -11.5129251
+  },
+  "data": {
+    "root": "/home/jupyter/mnt/datasets/LJSpeech",
+    "split": 0.95,
+    "train": {
+      "batch_size": 64,
+      "num_workers": 8,
+      "shuffle": true
+    },
+    "val": {
+      "batch_size": 64,
+      "num_workers": 8,
+      "shuffle": true
+    }
+  },
+  "optimizer": {
+    "type": "Adam",
+    "args": {
+      "lr": 2e-4,
+      "betas": [0.8, 0.99]
+    }
+  },
+  "lr_scheduler": {
+    "type": "ExponentialLR",
+    "args": {
+      "gamma": 0.999
+    }
+  },
+  "trainer": {
+    "overfit": false,
+    "n_epoch": 50,
+    "do_save": true,
+    "save_dir": "saved/",
+    "save_period": 5,
+    "verbosity": 2,
+    "early_stop": 100,
+    "len_epoch": 1000,
+    "val_len_epoch": 10000,
+    "visualize": "wandb",
+    "wandb_project": "HIFI",
+    "log_audio_interval": 50
+  }
+}
