@@ -51,7 +51,9 @@ class Trainer:
                 audio, sr = torchaudio.load(testdir / file)
                 test_audio.append(audio.squeeze(0))
 
-            self.test_wavs = pad_sequence(test_audio).transpose(0, 1).to(self.device)
+            test_wavs = pad_sequence(test_audio).transpose(0, 1).to(self.device)
+            with torch.no_grad():
+                self.test_specs = self.melspectrogram(test_wavs)
 
         self.log_audio_interval = config['trainer']['log_audio_interval']
         self.checkpoint_dir = config.save_dir
@@ -177,10 +179,8 @@ class Trainer:
 
         if self.do_test:
             with torch.no_grad():
-                self.logger.info("Generating test specs...")
-                test_specs = self.melspectrogram(self.test_wavs)
                 self.logger.info("Synthesizing test audio...")
-                pred_wav = self.model(test_specs).cpu()
+                pred_wav = self.model(self.test_specs).cpu()
                 self.logger.info("Test audio synthesized. Saving...")
                 sr = self.config['melspectrogram']['sample_rate']
                 save_dir = self.config.save_dir / f'epoch{num}'
@@ -189,8 +189,6 @@ class Trainer:
                     path = save_dir / f'Synthesized_{self.test_names[i]}.wav'
                     torchaudio.save(path, pred_wav[i], sr)
                     self.writer.add_audio(f'Test audio {self.test_names[i]}', path, sr)
-                    self.writer.add_image(f'Test spec {self.test_names[i]}', test_specs[i].detach().cpu().numpy(),
-                                          dataformats='HW')
 
         return gen_loss_sum
 
