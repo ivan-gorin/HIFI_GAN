@@ -1,6 +1,10 @@
 from tqdm import tqdm
 import torch
 from src.parse_config import ConfigParser
+from pathlib import Path
+import os
+import torchaudio
+from torch.nn.utils.rnn import pad_sequence
 
 
 class Trainer:
@@ -17,6 +21,7 @@ class Trainer:
         self.start_epoch = 1
         self.best_loss = 1000
         self.do_save = config['trainer']['do_save']
+        self.sr = config['melspectrogram']['sample_rate']
 
         if config.resume is not None:
             self._resume_checkpoint(config.resume)
@@ -35,6 +40,20 @@ class Trainer:
                                  len(self.train_dataloader.dataset) // config['data']['train']['batch_size'])
             self.val_len_epoch = min(config['trainer']['val_len_epoch'],
                                      len(self.val_dataloader.dataset) // config['data']['val']['batch_size'])
+
+        self.do_test = False
+        if 'test' in self.config['data']:
+            self.do_test = True
+            test_audio = []
+            testdir = Path(self.config['data']['test']['dir'])
+            self.test_names = os.listdir(testdir)
+            for file in self.test_names:
+                audio, sr = torchaudio.load(testdir / file)
+                test_audio.append(audio.squeeze(0))
+
+            waveform = pad_sequence(test_audio).transpose(0, 1).to(self.device)
+            self.test_specs = self.melspectrogram(waveform)
+
         self.log_audio_interval = config['trainer']['log_audio_interval']
         self.checkpoint_dir = config.save_dir
         self.save_period = config['trainer']['save_period']
@@ -100,12 +119,10 @@ class Trainer:
         self.writer.add_scalar("Discriminators Loss", disc_loss)
         self.writer.add_scalar("Generator Loss", gen_loss)
         if batch_idx % self.log_audio_interval == 0:
-            self.writer.add_image(f'True spec', spec[0].detach().cpu().numpy(), dataformats='HW')
-            self.writer.add_image(f'Pred spec', pred_spec[0].detach().cpu().numpy(), dataformats='HW')
-            self.writer.add_audio(f'True audio', waveform[0],
-                                  sample_rate=self.config['melspectrogram']['sample_rate'])
-            self.writer.add_audio(f'Pred audio', pred_wav[0],
-                                  sample_rate=self.config['melspectrogram']['sample_rate'])
+            self.writer.add_image('True spec', spec[0].detach().cpu().numpy(), dataformats='HW')
+            self.writer.add_image('Pred spec', pred_spec[0].detach().cpu().numpy(), dataformats='HW')
+            self.writer.add_audio('True audio', waveform[0], sample_rate=self.sr)
+            self.writer.add_audio('Pred audio', pred_wav[0], sample_rate=self.sr)
 
     def _train_epoch(self, num):
         self.model.train()
@@ -145,17 +162,27 @@ class Trainer:
                 disc_loss_sum += disc_loss
                 gen_loss_sum += gen_loss
 
-        self.writer.add_image(f'True spec', spec[0].detach().cpu().numpy(), dataformats='HW')
-        self.writer.add_image(f'Pred spec', pred_spec[0].detach().cpu().numpy(), dataformats='HW')
-        self.writer.add_audio(f'True audio', waveform[0],
-                              sample_rate=self.config['melspectrogram']['sample_rate'])
-        self.writer.add_audio(f'Pred audio', pred_wav[0],
-                              sample_rate=self.config['melspectrogram']['sample_rate'])
+        self.writer.add_image('True spec', spec[0].detach().cpu().numpy(), dataformats='HW')
+        self.writer.add_image('Pred spec', pred_spec[0].detach().cpu().numpy(), dataformats='HW')
+        self.writer.add_audio('True audio', waveform[0], sample_rate=self.sr)
+        self.writer.add_audio('Pred audio', pred_wav[0], sample_rate=self.sr)
 
         disc_loss_sum /= batch_idx + 1
         gen_loss_sum /= batch_idx + 1
         self.writer.add_scalar("Discriminators Loss", disc_loss_sum)
         self.writer.add_scalar("Generator Loss", gen_loss_sum)
+
+        if self.do_test:
+            self.logger.info("Synthesizing test audio...")
+            pred_wav = self.model(self.test_specs).cpu()
+            self.logger.info("Test audio synthesized. Saving...")
+            sr = self.config['melspectrogram']['sample_rate']
+            save_dir = self.config.save_dir / f'epoch{num}'
+            save_dir.mkdir(parents=True, exist_ok=True)
+            for i in range(len(pred_wav)):
+                path = save_dir / f'Synthesized_{self.test_names[i]}.wav'
+                torchaudio.save(path, pred_wav[i], sr)
+                self.writer.add_audio(f'Test audio {self.test_names[i]}', path, sr)
 
         return gen_loss_sum
 
@@ -211,9 +238,6 @@ class Trainer:
         # load architecture params from checkpoint.
         self.model.load_state_dict(checkpoint["state_dict"])
 
-        for param, value in self.config['optimizer']['args'].items():
-            if param in checkpoint['optimizer']['param_groups'][0]:
-                checkpoint['optimizer']['param_groups'][0][param] = value
         self.gen_opt.load_state_dict(checkpoint["gen_optimizer"])
         self.disc_opt.load_state_dict(checkpoint["disc_optimizer"])
         self.MSD.load_state_dict(checkpoint['MSD'])

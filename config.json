@@ -19,14 +19,17 @@
     "root": "./data",
     "split": 0.95,
     "train": {
-      "batch_size": 2,
+      "batch_size": 1,
       "num_workers": 4,
       "shuffle": true
     },
     "val": {
-      "batch_size": 2,
+      "batch_size": 1,
       "num_workers": 4,
       "shuffle": true
+    },
+    "test": {
+      "dir": "./data/test_audio"
     }
   },
   "optimizer": {
@@ -44,16 +47,17 @@
   },
   "trainer": {
     "overfit": false,
-    "n_epoch": 5,
+    "n_epoch": 51,
     "do_save": true,
     "save_dir": "saved/",
     "save_period": 5,
     "verbosity": 2,
     "early_stop": 100,
-    "len_epoch": 100,
-    "val_len_epoch": 10000,
+    "len_epoch": 1,
+    "val_len_epoch": 1,
     "visualize": "tensorboard",
     "wandb_project": "HIFI",
     "log_audio_interval": 50
-  }
+  },
+  "resume": "saved/checkpoint-epoch50.pth"
 }

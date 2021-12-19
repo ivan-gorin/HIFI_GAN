@@ -27,6 +27,9 @@
       "batch_size": 64,
       "num_workers": 8,
       "shuffle": true
+    },
+    "test": {
+      "dir": "./data/test_audio"
     }
   },
   "optimizer": {
@@ -55,5 +58,6 @@
     "visualize": "wandb",
     "wandb_project": "HIFI",
     "log_audio_interval": 50
-  }
+  },
+  "resume": "saved/checkpoint-epoch50.pth"
 }
