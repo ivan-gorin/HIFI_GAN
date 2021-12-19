@@ -1,6 +1,7 @@
 import importlib
 from datetime import datetime
 import numpy as np
+from pathlib import Path
 
 
 class WanDBWriter:
@@ -53,7 +54,7 @@ class WanDBWriter:
         }, step=self.step)
 
     def add_audio(self, scalar_name, audio, sample_rate=None, *args, **kwargs):
-        if not isinstance(audio, str):
+        if not (isinstance(audio, Path) or isinstance(audio, str)):
             audio = audio.detach().cpu().numpy().T
         self.wandb.log({
             self.scalar_name(scalar_name): self.wandb.Audio(audio, sample_rate=sample_rate)
