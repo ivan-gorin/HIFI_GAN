@@ -46,7 +46,7 @@ class Generator(nn.Module):
         for k in config.kernel_u:
             block_list.append(nn.Sequential(
                 nn.LeakyReLU(config.leaky),
-                weight_norm(nn.ConvTranspose1d(cur_ch, cur_ch // 2, kernel_size=k, stride=k // 2)),
+                weight_norm(nn.ConvTranspose1d(cur_ch, cur_ch // 2, kernel_size=k, stride=k // 2, padding=k // 4)),
                 MRF(cur_ch // 2, config)
             ))
             cur_ch //= 2
@@ -65,4 +65,4 @@ class Generator(nn.Module):
         x = self.net(x)
         x = self.leaky(x)
         x = self.conv2(x)
-        return self.tan(x).squeeze(1)
+        return self.tan(x)

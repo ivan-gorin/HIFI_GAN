@@ -1,4 +1,4 @@
-from utils import ModelConfig
+from .utils import ModelConfig
 
 import torch
 from torch import nn

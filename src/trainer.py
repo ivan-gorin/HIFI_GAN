@@ -41,7 +41,7 @@ class Trainer:
         self.checkpoint_dir = config.save_dir
         self.save_period = config['trainer']['save_period']
 
-        self.logger.info(self.model)
+        # self.logger.info(self.model)
         self.logger.info('Number of parameters {}'.format(sum(p.numel() for p in self.model.parameters())))
 
     def train(self):
@@ -60,9 +60,23 @@ class Trainer:
         # waveform_length = batch['waveform_length']
         spec = self.melspectrogram(waveform)
 
-        self.optimizer.zero_grad()
+        # add channel dim
+        waveform = waveform.unsqueeze(1)
         pred_wav = self.model(spec)
-        pred_spec = self.melspectrogram(pred_wav)
+        pred_spec = self.melspectrogram(pred_wav.squeeze(1))
+
+        # train discriminators
+        # MPD
+
+        mpd_pred, _ = self.MPD(pred_wav)
+        mpd_true, _ = self.MPD(waveform)
+        # MSD
+        msd_pred, _ = self.MSD(pred_wav)
+        msd_true, _ = self.MSD(waveform)
+
+        disc_loss = self.disc_criterion(mpd_pred, mpd_true, msd_pred, msd_true)
+
+        self.optimizer.zero_grad()
         loss = self.criterion(pred_spec, spec)
 
         if is_train:

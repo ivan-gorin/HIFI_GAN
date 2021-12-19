@@ -1,4 +1,4 @@
-from utils import ModelConfig
+from .utils import ModelConfig
 
 import torch
 from torch import nn
@@ -22,18 +22,18 @@ class SD(torch.nn.Module):
         self.list = nn.ModuleList([])
         for i in range(7):
             self.list.append(nn.Sequential(
-                norm_func(nn.Conv1d(in_ch[i], out_ch[i], kernels[i], strides[i], groups[i], paddings[i])),
+                norm_func(
+                    nn.Conv1d(in_channels=in_ch[i], out_channels=out_ch[i], kernel_size=kernels[i], stride=strides[i],
+                              groups=groups[i], padding=paddings[i])),
                 nn.LeakyReLU(config.leaky)
             ))
         self.list.append(norm_func(nn.Conv1d(1024, 1, 3, 1, padding=1)))
 
     def forward(self, x):
         res = []
-        for conv in self.convs:
+        for conv in self.list:
             x = conv(x)
             res.append(x)
-        x = self.conv_post(x)
-        res.append(x)
         x = torch.flatten(x, 1, -1)
 
         return x, res
