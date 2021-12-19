@@ -1,9 +1,6 @@
-from typing import Tuple, Dict, Optional, List, Union
-from itertools import islice
+from typing import Tuple, Dict, List
 import torch
-from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import pad_sequence
-from dataclasses import dataclass
 
 
 class LJSpeechCollator:

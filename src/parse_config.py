@@ -1,3 +1,5 @@
+import itertools
+
 import torch
 import json
 from datetime import datetime
@@ -5,12 +7,12 @@ from pathlib import Path
 from itertools import repeat
 
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import OneCycleLR
+from torch.optim.lr_scheduler import ExponentialLR
 from .model import Generator, ModelConfig, MPD, MSD
 from .dataset import LJSpeechDataset
 from .collator import LJSpeechCollator
 from .melspectrogram import MelSpectrogram
-from .loss import GeneratorLoss
+from .loss import GeneratorLoss, DiscriminatorLoss
 from .writer import WanDBWriter, TensorboardWriter
 from torch.utils.data import DataLoader
 from typing import Tuple
@@ -81,11 +83,13 @@ class ConfigParser:
     def get_device(self):
         return self.device
 
-    def get_optimizer(self, model):
-        return AdamW(model.parameters(), **self.config['optimizer']['args'])
+    def get_optimizers(self, model, msd, mpd):
+        return AdamW(model.parameters(), **self.config['optimizer']['args']), \
+               AdamW(itertools.chain(msd.parameters(), mpd.parameters()), **self.config['optimizer']['args'])
 
-    def get_scheduler(self, optimizer):
-        return OneCycleLR(optimizer, **self.config['lr_scheduler']['args'])
+    def get_schedulers(self, gen_optimizer, disc_optimizer):
+        return ExponentialLR(gen_optimizer, **self.config['lr_scheduler']['args']), \
+               ExponentialLR(disc_optimizer, **self.config['lr_scheduler']['args'])
 
     def get_dataloaders(self) -> Tuple[DataLoader, DataLoader]:
         dataset = LJSpeechDataset(self.config['data']['root'])
@@ -104,7 +108,7 @@ class ConfigParser:
         return train_dataloader, val_dataloader
 
     def get_melspectrogram(self):
-        return MelSpectrogram(self.config['melspectrogram'], 1.).to(self.device)
+        return MelSpectrogram(self.config['melspectrogram']).to(self.device)
 
     def get_model(self):
 
@@ -114,8 +118,8 @@ class ConfigParser:
     def get_discriminators(self):
         return MSD(self.model_config).to(self.device), MPD(self.model_config).to(self.device)
 
-    def get_criterion(self):
-        return GeneratorLoss()
+    def get_criterions(self):
+        return GeneratorLoss().to(self.device), DiscriminatorLoss().to(self.device)
 
     def get_writer(self):
         if self.config['trainer']['visualize'] == 'wandb':

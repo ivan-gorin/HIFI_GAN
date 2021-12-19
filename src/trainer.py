@@ -1,8 +1,6 @@
 from tqdm import tqdm
 import torch
-import torchaudio
 from src.parse_config import ConfigParser
-import matplotlib.pyplot as plt
 
 
 class Trainer:
@@ -15,7 +13,7 @@ class Trainer:
         self.train_dataloader, self.val_dataloader = config.get_dataloaders()
         self.writer = config.get_writer()
         self.logger = config.get_logger('trainer')
-        self.optimizer = config.get_optimizer(self.model)
+        self.gen_opt, self.disc_opt = config.get_optimizers(self.model, self.MSD, self.MPD)
         self.start_epoch = 1
         self.best_loss = 1000
         self.do_save = config['trainer']['do_save']
@@ -23,9 +21,9 @@ class Trainer:
         if config.resume is not None:
             self._resume_checkpoint(config.resume)
 
-        self.scheduler = config.get_scheduler(self.optimizer)
+        self.gen_scheduler, self.disc_scheduler = config.get_schedulers(self.gen_opt, self.disc_opt)
         self.melspectrogram = config.get_melspectrogram()
-        self.criterion = config.get_criterion()
+        self.gen_crit, self.disc_crit = config.get_criterions()
         self.overfit = config['trainer']['overfit']
 
         self.n_epoch = config['trainer']['n_epoch']
@@ -52,12 +50,10 @@ class Trainer:
             self._save_checkpoint(self._last_epoch, save_best=False)
             raise e
 
-    def _process_batch(self, batch, epoch_num, batch_idx, is_train=True):
-        if is_train:
-            self.writer.set_step((epoch_num - 1) * self.len_epoch + batch_idx, 'train')
+    def _process_batch(self, batch, epoch_num, batch_idx):
+        self.writer.set_step((epoch_num - 1) * self.len_epoch + batch_idx, 'train')
 
         waveform = batch['waveform'].to(self.device)
-        # waveform_length = batch['waveform_length']
         spec = self.melspectrogram(waveform)
 
         # add channel dim
@@ -66,35 +62,50 @@ class Trainer:
         pred_spec = self.melspectrogram(pred_wav.squeeze(1))
 
         # train discriminators
-        # MPD
+        self.disc_opt.zero_grad()
 
-        mpd_pred, _ = self.MPD(pred_wav)
+        # MPD
+        mpd_pred, _ = self.MPD(pred_wav.detach())
         mpd_true, _ = self.MPD(waveform)
+
         # MSD
-        msd_pred, _ = self.MSD(pred_wav)
+        msd_pred, _ = self.MSD(pred_wav.detach())
         msd_true, _ = self.MSD(waveform)
 
-        disc_loss = self.disc_criterion(mpd_pred, mpd_true, msd_pred, msd_true)
+        disc_loss = self.disc_crit(mpd_pred, mpd_true, msd_pred, msd_true)
 
-        self.optimizer.zero_grad()
-        loss = self.criterion(pred_spec, spec)
+        disc_loss.backward()
+        self.disc_opt.step()
 
-        if is_train:
-            self.writer.add_scalar("Loss", loss)
-            if self.overfit and batch_idx % self.log_audio_interval == 0:
-                # if self.config['trainer']['visualize'] == 'wandb':
-                for idx in (1, 2):
-                    self.writer.add_image(f'True spec {idx}', spec[idx].detach().cpu().numpy(), dataformats='HW')
-                    self.writer.add_image(f'Pred spec {idx}', pred_spec[idx].detach().cpu().numpy(), dataformats='HW')
-                    self.writer.add_audio(f'True audio {idx}', waveform[idx],
-                                          sample_rate=self.config['melspectrogram']['sample_rate'])
-                    self.writer.add_audio(f'Pred audio {idx}', pred_wav[idx],
-                                          sample_rate=self.config['melspectrogram']['sample_rate'])
-            loss.backward()
-            self.optimizer.step()
-            self.scheduler.step()
+        # train generator
+        self.gen_opt.zero_grad()
 
-        return loss
+        # MPD
+        mpd_pred, mpd_pred_feats = self.MPD(pred_wav)
+        _, mpd_true_feats = self.MPD(waveform)
+
+        # MSD
+        msd_pred, msd_pred_feats = self.MSD(pred_wav)
+        _, msd_true_feats = self.MSD(waveform)
+
+        gen_loss = self.gen_crit(spec, pred_spec, mpd_pred_feats, mpd_true_feats, msd_pred_feats, msd_true_feats,
+                                 mpd_pred, msd_pred)
+
+        gen_loss.backward()
+        self.gen_opt.step()
+
+        self.disc_scheduler.step()
+        self.gen_scheduler.step()
+
+        self.writer.add_scalar("Discriminators Loss", disc_loss)
+        self.writer.add_scalar("Generator Loss", gen_loss)
+        if batch_idx % self.log_audio_interval == 0:
+            self.writer.add_image(f'True spec', spec[0].detach().cpu().numpy(), dataformats='HW')
+            self.writer.add_image(f'Pred spec', pred_spec[0].detach().cpu().numpy(), dataformats='HW')
+            self.writer.add_audio(f'True audio', waveform[0],
+                                  sample_rate=self.config['melspectrogram']['sample_rate'])
+            self.writer.add_audio(f'Pred audio', pred_wav[0],
+                                  sample_rate=self.config['melspectrogram']['sample_rate'])
 
     def _train_epoch(self, num):
         self.model.train()
@@ -106,18 +117,47 @@ class Trainer:
     def _val_epoch(self, num):
         self.model.eval()
         self.writer.set_step(num * self.len_epoch, 'val')
-        loss_sum = 0
+        disc_loss_sum = 0
+        gen_loss_sum = 0
         with torch.no_grad():
             for batch_idx, batch in enumerate(tqdm(self.val_dataloader, desc=f'Validation', total=self.val_len_epoch)):
                 if batch_idx >= self.val_len_epoch:
                     break
-                loss = self._process_batch(batch, num, batch_idx, is_train=False)
-                loss_sum += loss
+                waveform = batch['waveform'].to(self.device)
+                spec = self.melspectrogram(waveform)
 
-        loss_sum /= self.val_len_epoch
-        self.writer.add_scalar("Loss", loss_sum)
+                waveform = waveform.unsqueeze(1)
+                pred_wav = self.model(spec)
+                pred_spec = self.melspectrogram(pred_wav.squeeze(1))
 
-        return loss_sum
+                # MPD
+                mpd_pred, mpd_pred_feats = self.MPD(pred_wav)
+                mpd_true, mpd_true_feats = self.MPD(waveform)
+
+                # MSD
+                msd_pred, msd_pred_feats = self.MSD(pred_wav)
+                msd_true, msd_true_feats = self.MSD(waveform)
+
+                disc_loss = self.disc_crit(mpd_pred, mpd_true, msd_pred, msd_true)
+                gen_loss = self.gen_crit(spec, pred_spec, mpd_pred_feats, mpd_true_feats, msd_pred_feats,
+                                         msd_true_feats, mpd_pred, msd_pred)
+
+                disc_loss_sum += disc_loss
+                gen_loss_sum += gen_loss
+
+        self.writer.add_image(f'True spec', spec[0].detach().cpu().numpy(), dataformats='HW')
+        self.writer.add_image(f'Pred spec', pred_spec[0].detach().cpu().numpy(), dataformats='HW')
+        self.writer.add_audio(f'True audio', waveform[0],
+                              sample_rate=self.config['melspectrogram']['sample_rate'])
+        self.writer.add_audio(f'Pred audio', pred_wav[0],
+                              sample_rate=self.config['melspectrogram']['sample_rate'])
+
+        disc_loss_sum /= batch_idx + 1
+        gen_loss_sum /= batch_idx + 1
+        self.writer.add_scalar("Discriminators Loss", disc_loss_sum)
+        self.writer.add_scalar("Generator Loss", gen_loss_sum)
+
+        return gen_loss_sum
 
     def _train_process(self):
         for epoch_num in range(self.start_epoch, self.n_epoch + 1):
@@ -125,7 +165,7 @@ class Trainer:
             self._train_epoch(epoch_num)
             best = False
             loss_avg = self._val_epoch(epoch_num)
-            self.logger.info('Val loss: {}'.format(loss_avg))
+            self.logger.info('Val gen loss: {}'.format(loss_avg))
             if loss_avg < self.best_loss:
                 self.best_loss = loss_avg
                 best = True
@@ -137,7 +177,6 @@ class Trainer:
         Saving checkpoints
 
         :param epoch: current epoch number
-        :param log: logging information of the epoch
         :param save_best: if True, rename the saved checkpoint to 'model_best.pth'
         """
         state = {
@@ -145,7 +184,8 @@ class Trainer:
             "state_dict": self.model.state_dict(),
             "MSD": self.MSD.state_dict(),
             "MPD": self.MPD.state_dict(),
-            "optimizer": self.optimizer.state_dict(),
+            "gen_optimizer": self.gen_opt.state_dict(),
+            "disc_optimizer": self.disc_opt.state_dict(),
             "config": self.config,
         }
         filename = str(self.checkpoint_dir / "checkpoint-epoch{}.pth".format(epoch))
@@ -171,23 +211,14 @@ class Trainer:
         # load architecture params from checkpoint.
         self.model.load_state_dict(checkpoint["state_dict"])
 
-        # load optimizer state from checkpoint only when optimizer type is not changed.
-        # if (
-        #         checkpoint["config"]["optimizer"] != self.config["optimizer"] or
-        #         checkpoint["config"]["lr_scheduler"] != self.config["lr_scheduler"]
-        # ):
-        #     self.logger.warning(
-        #         "Warning: Optimizer or lr_scheduler given in config file is different "
-        #         "from that of checkpoint. Optimizer parameters not being resumed."
-        #     )
-        # else:
         for param, value in self.config['optimizer']['args'].items():
             if param in checkpoint['optimizer']['param_groups'][0]:
                 checkpoint['optimizer']['param_groups'][0][param] = value
-        self.optimizer.load_state_dict(checkpoint["optimizer"])
+        self.gen_opt.load_state_dict(checkpoint["gen_optimizer"])
+        self.disc_opt.load_state_dict(checkpoint["disc_optimizer"])
         self.MSD.load_state_dict(checkpoint['MSD'])
         self.MPD.load_state_dict(checkpoint['MPD'])
-        self.logger.info(self.optimizer)
+
         self.logger.info(
             "Checkpoint loaded. Resume training from epoch {}".format(self.start_epoch)
         )

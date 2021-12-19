@@ -3,7 +3,6 @@ from .utils import ModelConfig
 import torch
 from torch import nn
 from torch.nn.utils import weight_norm, spectral_norm
-from torch.nn import functional as F
 
 
 class SD(torch.nn.Module):

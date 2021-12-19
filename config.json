@@ -19,43 +19,39 @@
     "root": "./data",
     "split": 0.95,
     "train": {
-      "batch_size": 4,
-      "num_workers": 6,
-      "shuffle": false
+      "batch_size": 2,
+      "num_workers": 4,
+      "shuffle": true
     },
     "val": {
-      "batch_size": 4,
-      "num_workers": 6,
+      "batch_size": 2,
+      "num_workers": 4,
       "shuffle": true
     }
   },
   "optimizer": {
     "type": "Adam",
     "args": {
-      "lr": 3e-4,
-      "weight_decay": 0.0001
+      "lr": 2e-4,
+      "betas": [0.8, 0.99]
     }
   },
   "lr_scheduler": {
-    "type": "OneCycleLR",
+    "type": "ExponentialLR",
     "args": {
-      "steps_per_epoch": 5000,
-      "epochs": 1,
-      "anneal_strategy": "cos",
-      "max_lr": 4e-3,
-      "pct_start": 0.2
+      "gamma": 0.999
     }
   },
   "trainer": {
-    "overfit": true,
-    "n_epoch": 1,
-    "do_save": false,
+    "overfit": false,
+    "n_epoch": 5,
+    "do_save": true,
     "save_dir": "saved/",
     "save_period": 5,
     "verbosity": 2,
     "early_stop": 100,
-    "len_epoch": 5000,
-    "val_len_epoch": 5,
+    "len_epoch": 100,
+    "val_len_epoch": 10000,
     "visualize": "tensorboard",
     "wandb_project": "HIFI",
     "log_audio_interval": 50

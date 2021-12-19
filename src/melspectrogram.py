@@ -21,7 +21,7 @@ MelConfig = {
 
 class MelSpectrogram(nn.Module):
 
-    def __init__(self, config: Dict[str, Union[int, float]], power: float):
+    def __init__(self, config: Dict[str, Union[int, float]]):
         """
         sample_rate, win_length, hop_length
         n_fft
