@@ -14,7 +14,11 @@ class Trainer:
         self.device = config.get_device()
         self.model = config.get_model()
         self.MSD, self.MPD = config.get_discriminators()
-        self.train_dataloader, self.val_dataloader = config.get_dataloaders()
+        self.do_val = config['trainer']['do_val']
+        if self.do_val:
+            self.train_dataloader, self.val_dataloader = config.get_dataloaders()
+        else:
+            self.train_dataloader, _ = config.get_dataloaders()
         self.writer = config.get_writer()
         self.logger = config.get_logger('trainer')
         self.gen_opt, self.disc_opt = config.get_optimizers(self.model, self.MSD, self.MPD)
@@ -34,12 +38,14 @@ class Trainer:
         self.n_epoch = config['trainer']['n_epoch']
         if self.overfit:
             self.len_epoch = config['trainer']['len_epoch']
-            self.val_len_epoch = config['trainer']['val_len_epoch']
+            if self.do_val:
+                self.val_len_epoch = config['trainer']['val_len_epoch']
         else:
             self.len_epoch = min(config['trainer']['len_epoch'],
                                  len(self.train_dataloader.dataset) // config['data']['train']['batch_size'])
-            self.val_len_epoch = min(config['trainer']['val_len_epoch'],
-                                     len(self.val_dataloader.dataset) // config['data']['val']['batch_size'])
+            if self.do_val:
+                self.val_len_epoch = min(config['trainer']['val_len_epoch'],
+                                         len(self.val_dataloader.dataset) // config['data']['val']['batch_size'])
 
         self.do_test = False
         if 'test' in self.config['data']:
@@ -143,6 +149,23 @@ class Trainer:
         self.MPD.eval()
         self.MSD.eval()
         self.writer.set_step(num * self.len_epoch, 'val')
+
+        if self.do_test:
+            with torch.no_grad():
+                self.logger.info("Synthesizing test audio...")
+                pred_wav = self.model(self.test_specs).cpu()
+                self.logger.info("Test audio synthesized. Saving...")
+                sr = self.config['melspectrogram']['sample_rate']
+                save_dir = self.config.save_dir / f'epoch{num}'
+                save_dir.mkdir(parents=True, exist_ok=True)
+                for i in range(len(pred_wav)):
+                    path = save_dir / f'Synthesized_{self.test_names[i]}.wav'
+                    torchaudio.save(path, pred_wav[i], sr)
+                    self.writer.add_audio(f'Test audio {self.test_names[i]}', path, sr)
+
+        if not self.do_val:
+            return 0
+
         disc_loss_sum = 0
         gen_loss_sum = 0
         with torch.no_grad():
@@ -181,19 +204,6 @@ class Trainer:
         self.writer.add_scalar("Discriminators Loss", disc_loss_sum)
         self.writer.add_scalar("Generator Loss", gen_loss_sum)
 
-        if self.do_test:
-            with torch.no_grad():
-                self.logger.info("Synthesizing test audio...")
-                pred_wav = self.model(self.test_specs).cpu()
-                self.logger.info("Test audio synthesized. Saving...")
-                sr = self.config['melspectrogram']['sample_rate']
-                save_dir = self.config.save_dir / f'epoch{num}'
-                save_dir.mkdir(parents=True, exist_ok=True)
-                for i in range(len(pred_wav)):
-                    path = save_dir / f'Synthesized_{self.test_names[i]}.wav'
-                    torchaudio.save(path, pred_wav[i], sr)
-                    self.writer.add_audio(f'Test audio {self.test_names[i]}', path, sr)
-
         return gen_loss_sum
 
     def _train_process(self):
@@ -202,10 +212,11 @@ class Trainer:
             self._train_epoch(epoch_num)
             best = False
             loss_avg = self._val_epoch(epoch_num)
-            self.logger.info('Val gen loss: {}'.format(loss_avg))
-            if loss_avg < self.best_loss:
-                self.best_loss = loss_avg
-                best = True
+            if self.do_val:
+                self.logger.info('Val gen loss: {}'.format(loss_avg))
+                if loss_avg < self.best_loss:
+                    self.best_loss = loss_avg
+                    best = True
             if self.do_save and (epoch_num % self.save_period == 0 or best):
                 self._save_checkpoint(epoch_num, save_best=best, only_best=True)
 

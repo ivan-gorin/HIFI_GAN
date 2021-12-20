@@ -17,7 +17,7 @@
   },
   "data": {
     "root": "/home/jupyter/mnt/datasets/LJSpeech",
-    "split": 0.95,
+    "split": 1,
     "train": {
       "batch_size": 64,
       "num_workers": 8,
@@ -49,6 +49,7 @@
     "overfit": false,
     "n_epoch": 100,
     "do_save": true,
+    "do_val": false,
     "save_dir": "saved/",
     "save_period": 5,
     "verbosity": 2,
@@ -59,5 +60,5 @@
     "wandb_project": "HIFI",
     "log_audio_interval": 50
   },
-  "resume": "saved/1219_05_00_00_132/checkpoint-epoch50.pth"
+  "resume": "saved/1219_18_27_23_071/checkpoint-epoch90.pth"
 }

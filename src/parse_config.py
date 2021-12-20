@@ -93,14 +93,21 @@ class ConfigParser:
 
     def get_dataloaders(self) -> Tuple[DataLoader, DataLoader]:
         dataset = LJSpeechDataset(self.config['data']['root'])
-        train_split = int(len(dataset) * self.config['data']['split'])
-        train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_split, len(dataset) - train_split],
-                                                                    generator=torch.Generator().manual_seed(self.seed))
 
-        train_dataloader = DataLoader(dataset=train_dataset, collate_fn=LJSpeechCollator(),
-                                      **self.config['data']['train'])
-        val_dataloader = DataLoader(dataset=test_dataset, collate_fn=LJSpeechCollator(),
-                                    **self.config['data']['val'])
+        if not self.config['trainer']['do_val']:
+            train_dataloader = DataLoader(dataset=dataset, collate_fn=LJSpeechCollator(),
+                                          **self.config['data']['train'])
+            val_dataloader = None
+        else:
+            train_split = int(len(dataset) * self.config['data']['split'])
+            train_dataset, test_dataset = torch.utils.data.random_split(dataset, [train_split, len(dataset) - train_split],
+                                                                        generator=torch.Generator().manual_seed(self.seed))
+
+            train_dataloader = DataLoader(dataset=train_dataset, collate_fn=LJSpeechCollator(),
+                                          **self.config['data']['train'])
+            val_dataloader = DataLoader(dataset=test_dataset, collate_fn=LJSpeechCollator(),
+                                        **self.config['data']['val'])
+
         if self.config['trainer']['overfit']:
             train_dataloader = iter(train_dataloader)
             batch = next(train_dataloader)
