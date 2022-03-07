@@ -1,5 +1,7 @@
 # HIFI GAN
 
+Implementation of HIFI GAN network: [original paper](https://arxiv.org/abs/2010.05646)
+
 Tested on python 3.7.12
 
 Setup instructions:
