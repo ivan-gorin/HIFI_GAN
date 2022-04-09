@@ -20,3 +20,5 @@ Test with
 ```
 python test.py --config config.json --model PATH_TO_CHECKPOINT
 ```
+
+[Report](https://wandb.ai/ivan-gorin/HIFI/reports/HIFI-GAN-Report--VmlldzoxMzU4MjU2) (in Russian)
